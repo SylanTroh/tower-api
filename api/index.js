@@ -1,10 +1,11 @@
 const express = require('express');
+const http = require('http');
+const fs = require('fs');
+
 const app = express();
 
-const port = process.env.PORT || 3000; // Use the port provided by the host or default to 3000
-app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-});
+// Create an HTTP service.
+http.createServer(app).listen(80);
 
 // Initialize Bricks
 let bricks = 0;
