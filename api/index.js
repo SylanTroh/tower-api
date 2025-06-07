@@ -5,7 +5,9 @@ const fs = require('fs');
 const app = express();
 
 // Create an HTTP service.
-http.createServer(app).listen(80);
+http.createServer(app).listen(80, () => {
+    console.log(`Server listening on port 80`);
+});
 
 // Initialize Bricks
 let bricks = 0;
