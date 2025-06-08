@@ -42,7 +42,10 @@ app.get('/time', (req, res) => {
 });
 
 //Add One Brick
-app.get('/place', (req, res) => {
+app.get('/place/:id', (req, res) => {
     bricks += 1;
-    res.send("Success!<br>"+bricks.toString());
+    res.send("Success!"
+        +"<br>Bricks: " + bricks.toString()
+        +"<br>URL: " + req.params.id
+    );
 });
