@@ -30,7 +30,7 @@ function SuccessResponse(bricks,res){
     const d = new Date();
     let time = d.getTime()
     res.send(
-        bricks.toString()+"<br>"+
+        bricks.toString()+","+
         time.toString()
     );
 }
