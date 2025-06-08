@@ -10,8 +10,8 @@ https.createServer(
         // Provide the private and public key to the server by reading each
         // file's content with the readFileSync() method.
         {
-        key: fs.readFileSync("~/.ssl/key.pem"),
-        cert: fs.readFileSync("~/.ssl/cert.pem"),
+        key: fs.readFileSync("../.ssl/key.pem"),
+        cert: fs.readFileSync("../.ssl/cert.pem"),
         },
         app
     )
