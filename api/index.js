@@ -3,7 +3,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 
-const dataPath = 'api/numBricks.txt'
+const dataPath = 'api/numBricks.txt';
 
 const app = express();
 
@@ -40,14 +40,14 @@ function FailureResponse(res){
 }
 
 // Initialize Bricks
-let bricks = fs.readFile(dataPath, err => {
-        if (err) {
-            console.error(err);
-        } else {
-            // file read successfully
-        }
-    });
-console.log(`Read Bricks from File: ` + bricks);
+let bricks = 0;
+try {
+  const data = fs.readFileSync(dataPath, 'utf8');
+  bricks = parseInt(data) || 0;
+  console.log(`Read Bricks from File: ${bricks}`);
+} catch (err) {
+  console.error('Error reading bricks file:', err);
+}
 
 //Show Current Bricks and add One
 app.get('/', (req, res) => {
@@ -57,13 +57,13 @@ app.get('/', (req, res) => {
 //Add One Brick
 app.get('/place/:id', (req, res) => {
     bricks += 1;
-    fs.writeFile(dataPath,bricks.toString(), err => {
+    fs.writeFile(dataPath, bricks.toString(), err => {
         if (err) {
-            console.error(err);
+        console.error('Error writing to file:', err);
+        FailureResponse(res);
         } else {
-            // file written successfully
+        console.log(`Placed Brick ${bricks} on ID: ${req.params.id}`);
+        SuccessResponse(bricks, res);
         }
     });
-    console.log(`Placed Brick` + bricks + ` on ID: ` + req.params.id);
-    SuccessResponse(bricks,res);
 });
