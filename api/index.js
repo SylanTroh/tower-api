@@ -26,7 +26,7 @@ http.createServer(app).listen(80, () => {
     console.log(`Server listening on port 80`);
 });
 
-function SuccessResponse(res){
+function SuccessResponse(bricks,res){
     const d = new Date();
     let time = d.getTime()
     res.send(
@@ -51,10 +51,7 @@ console.log(`Read Bricks from File: ` + bricks);
 
 //Show Current Bricks and add One
 app.get('/', (req, res) => {
-    res.send(bricks.toString());
-});
-app.get('/bricks', (req, res) => {
-    SuccessResponse(res);
+    SuccessResponse(bricks,res);
 });
 
 //Add One Brick
@@ -68,5 +65,5 @@ app.get('/place/:id', (req, res) => {
         }
     });
     console.log(`Placed Brick` + bricks + ` on ID: ` + req.params.id);
-    SuccessResponse(res);
+    SuccessResponse(bricks,res);
 });
