@@ -3,7 +3,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 
-const dataPath = 'numBricks.txt'
+const dataPath = 'api/numBricks.txt'
 
 const app = express();
 
