@@ -40,7 +40,13 @@ function FailureResponse(res){
 }
 
 // Initialize Bricks
-let bricks = fs.readFile(dataPath)
+let bricks = fs.readFile(dataPath, err => {
+        if (err) {
+            console.error(err);
+        } else {
+            // file read successfully
+        }
+    });
 console.log(`Read Bricks from File: ` + bricks);
 
 //Show Current Bricks and add One
@@ -54,7 +60,13 @@ app.get('/bricks', (req, res) => {
 //Add One Brick
 app.get('/place/:id', (req, res) => {
     bricks += 1;
-    fs.writeFile(dataPath,bricks.toString())
+    fs.writeFile(dataPath,bricks.toString(), err => {
+        if (err) {
+            console.error(err);
+        } else {
+            // file written successfully
+        }
+    });
     console.log(`Placed Brick` + bricks + ` on ID: ` + req.params.id);
     SuccessResponse(res);
 });
