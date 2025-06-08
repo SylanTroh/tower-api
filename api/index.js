@@ -3,6 +3,8 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 
+const dataPath = 'numBricks.txt'
+
 const app = express();
 
 // Create an HTTPS service.
@@ -24,28 +26,35 @@ http.createServer(app).listen(80, () => {
     console.log(`Server listening on port 80`);
 });
 
+function SuccessResponse(res){
+    const d = new Date();
+    let time = d.getTime()
+    res.send(
+        bricks.toString()+"<br>"+
+        time.toString()
+    );
+}
+
+function FailureResponse(res){
+    res.send("Error");
+}
+
 // Initialize Bricks
-let bricks = 0;
+let bricks = fs.readFile(dataPath)
+console.log(`Read Bricks from File: ` + bricks);
+
 //Show Current Bricks and add One
 app.get('/', (req, res) => {
     res.send(bricks.toString());
 });
 app.get('/bricks', (req, res) => {
-    res.send(bricks.toString());
-});
-
-// Get current server time
-app.get('/time', (req, res) => {
-    const d = new Date();
-    let time = d.getTime()
-    res.send(time.toString());
+    SuccessResponse(res);
 });
 
 //Add One Brick
 app.get('/place/:id', (req, res) => {
     bricks += 1;
-    res.send("Success!"
-        +"<br>Bricks: " + bricks.toString()
-        +"<br>URL: " + req.params.id
-    );
+    fs.writeFile(dataPath,bricks.toString())
+    console.log(`Placed Brick` + bricks + ` on ID: ` + req.params.id);
+    SuccessResponse(res);
 });
