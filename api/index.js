@@ -1,8 +1,23 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 
 const app = express();
+
+// Create an HTTPS service.
+https.createServer(
+        // Provide the private and public key to the server by reading each
+        // file's content with the readFileSync() method.
+        {
+        key: fs.readFileSync("~/.ssl/key.pem"),
+        cert: fs.readFileSync("~/.ssl/cert.pem"),
+        },
+        app
+    )
+    .listen(443, () => {
+    console.log(`Server listening on port 443`);
+});
 
 // Create an HTTP service.
 http.createServer(app).listen(80, () => {
