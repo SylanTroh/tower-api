@@ -64,7 +64,7 @@ app.get('/place/:id', (req, res) => {
 
 //This is not a security-critical application, I just need a stable hash
 const keyPath = 'api/key.txt';
-const otpkey = fs.readFileSync(keyPath, 'utf-8');
+const otpkey = fs.readFileSync(keyPath, 'utf-8').split(/\n/g)[0];
 const interval = 10;
 function MD5Hash(str) {
       const hash = md5(str);
