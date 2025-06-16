@@ -27,8 +27,8 @@ function startServer() {
         // Create HTTPS server
         const httpsServer = https.createServer(
             {
-                //key: fs.readFileSync("../.ssl/key.pem"),
-                //cert: fs.readFileSync("../.ssl/cert.pem"),
+                key: fs.readFileSync("../.ssl/key.pem"),
+                cert: fs.readFileSync("../.ssl/cert.pem"),
             },
             app
         );
