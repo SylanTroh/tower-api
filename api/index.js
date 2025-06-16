@@ -28,8 +28,8 @@ function startServer() {
         // Create HTTPS server
         const httpsServer = https.createServer(
             {
-                key: fs.readFileSync("../.ssl/key.pem"),
-                cert: fs.readFileSync("../.ssl/cert.pem"),
+                //key: fs.readFileSync("../.ssl/key.pem"),
+                //cert: fs.readFileSync("../.ssl/cert.pem"),
             },
             app
         );
@@ -69,6 +69,7 @@ function SuccessResponse(bricks,res,req){
 
 function FailureResponse(res,req){
     console.log(`Error: Incorrect otp: ${req.params.id}`);
+    console.log(CalculateOTP(CalculateCounter()));
     res.send("Error");
 }
 
@@ -128,7 +129,7 @@ function SaveBricks(){
 
 const commands = {
     setbricks: (number) => {
-        bricks = number;
+        bricks = parseInt(number);
         fs.writeFile(dataPath, bricks.toString(), err => {
             if (err) {
                 console.error('Error writing to file:', err);
