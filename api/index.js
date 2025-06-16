@@ -9,25 +9,54 @@ const dataPath = 'api/numBricks.txt';
 
 const app = express();
 
-// Create an HTTPS service.
-https.createServer(
-        // Provide the private and public key to the server by reading each
-        // file's content with the readFileSync() method.
-        {
-        //key: fs.readFileSync("../.ssl/key.pem"),
-        //cert: fs.readFileSync("../.ssl/cert.pem"),
-        },
-        app
-    )
-    .listen(443, () => {
-    console.log(`Server listening on port 443`);
+//Show Current Bricks and add One
+app.get('/', (req, res) => {
+    SuccessResponse(bricks,res,req);
 });
 
-// Create an HTTP service.
-http.createServer(app).listen(80, () => {
-    console.log(`Server listening on port 80`);
+//Add One Brick
+app.get('/place/:id', (req, res) => {
+    if(CheckOTP(req.params.id)) { PlaceBrick(res,req);}
+    else { FailureResponse(res,req);}
 });
 
+function startServer() {
+    const servers = [];
+
+    try {
+        // Create HTTPS server
+        const httpsServer = https.createServer(
+            {
+                //key: fs.readFileSync("../.ssl/key.pem"),
+                //cert: fs.readFileSync("../.ssl/cert.pem"),
+            },
+            app
+        );
+
+        httpsServer.listen(443, () => {
+            console.log('HTTPS Server listening on port 443');
+        });
+
+        servers.push(httpsServer);
+    } catch (error) {
+        console.error('Failed to start HTTPS server:', error.message);
+    }
+
+    try {
+        // Create HTTP server
+        const httpServer = http.createServer(app);
+
+        httpServer.listen(80, () => {
+            console.log('HTTP Server listening on port 80');
+        });
+
+        servers.push(httpServer);
+    } catch (error) {
+        console.error('Failed to start HTTP server:', error.message);
+    }
+
+    return servers;
+}
 function SuccessResponse(bricks,res,req){
     const d = new Date();
     let time = d.getTime()
@@ -51,17 +80,6 @@ try {
 } catch (err) {
   console.error('Error reading bricks file:', err);
 }
-
-//Show Current Bricks and add One
-app.get('/', (req, res) => {
-    SuccessResponse(bricks,res,req);
-});
-
-//Add One Brick
-app.get('/place/:id', (req, res) => {
-    if(CheckOTP(req.params.id)) { PlaceBrick(res,req);}
-    else { FailureResponse(res,req);}
-});
 
 //This is not a security-critical application, I just need a stable hash
 const keyPath = 'api/key.txt';
@@ -206,5 +224,7 @@ rl.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Start the CLI
+// Start The Server
+console.log('Starting Server');
+const servers = startServer();
 startCLI();
