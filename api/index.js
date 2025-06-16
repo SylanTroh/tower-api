@@ -6,6 +6,7 @@ const md5 = require("md5");
 const readline = require('readline');
 
 const dataPath = 'api/numBricks.txt';
+const backupPath = 'api/saveBricks.txt';
 
 const app = express();
 
@@ -71,20 +72,6 @@ function FailureResponse(res,req){
     res.send("Error");
 }
 
-// Initialize Bricks
-let bricks = 0;
-try {
-  const data = fs.readFileSync(dataPath, 'utf8');
-  bricks = parseInt(data) || 0;
-  console.log(`Read Bricks from File: ${bricks}`);
-} catch (err) {
-  console.error('Error reading bricks file:', err);
-}
-
-//This is not a security-critical application, I just need a stable hash
-const keyPath = 'api/key.txt';
-const otpkey = fs.readFileSync(keyPath, 'utf-8').split(/\n/g)[0];
-const interval = 10;
 function MD5Hash(str) {
       const hash = md5(str);
       return hash;
@@ -122,6 +109,17 @@ function PlaceBrick(res,req)
         else {
             console.log(`Placed Brick ${bricks} on ID: ${req.params.id}`);
             SuccessResponse(bricks, res, req);
+        }
+    });
+}
+
+function SaveBricks(){
+    fs.appendFile(backupPath, bricks.toString() + `\n`, err => {
+        if (err) {
+            console.error('Error writing to file:', err);
+        }
+        else {
+            console.log(`Logged ${bricks} bricks`);
         }
     });
 }
@@ -224,7 +222,24 @@ rl.on('SIGINT', () => {
     process.exit(0);
 });
 
+
+// Initialize Bricks
+let bricks = 0;
+try {
+    const data = fs.readFileSync(dataPath, 'utf8');
+    bricks = parseInt(data) || 0;
+    console.log(`Read Bricks from File: ${bricks}`);
+} catch (err) {
+    console.error('Error reading bricks file:', err);
+}
+
+//This is not a security-critical application, I just need a stable hash
+const keyPath = 'api/key.txt';
+const otpkey = fs.readFileSync(keyPath, 'utf-8').split(/\n/g)[0];
+const interval = 10;
+
 // Start The Server
 console.log('Starting Server');
 const servers = startServer();
 startCLI();
+const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);

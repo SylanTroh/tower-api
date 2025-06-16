@@ -142,3 +142,4 @@ dist
 # Project Specific Stuff
 api/key.txt
 api/numBricks.txt
+api/saveBricks.txt
