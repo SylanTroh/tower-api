@@ -69,7 +69,6 @@ function SuccessResponse(bricks,res,req){
 
 function FailureResponse(res,req){
     console.log(`Error: Incorrect otp: ${req.params.id}`);
-    console.log(CalculateOTP(CalculateCounter()));
     res.send("Error");
 }
 
