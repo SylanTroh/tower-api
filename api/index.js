@@ -3,6 +3,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const md5 = require("md5");
+const readline = require('readline');
 
 const dataPath = 'api/numBricks.txt';
 
@@ -13,8 +14,8 @@ https.createServer(
         // Provide the private and public key to the server by reading each
         // file's content with the readFileSync() method.
         {
-        key: fs.readFileSync("../.ssl/key.pem"),
-        cert: fs.readFileSync("../.ssl/cert.pem"),
+        //key: fs.readFileSync("../.ssl/key.pem"),
+        //cert: fs.readFileSync("../.ssl/cert.pem"),
         },
         app
     )
@@ -99,10 +100,111 @@ function PlaceBrick(res,req)
         if (err) {
             console.error('Error writing to file:', err);
             FailureResponse(res,req);
-        } 
+        }
         else {
             console.log(`Placed Brick ${bricks} on ID: ${req.params.id}`);
             SuccessResponse(bricks, res, req);
         }
     });
 }
+
+/// Console Prompt
+
+const commands = {
+    setbricks: (number) => {
+        bricks = number;
+        fs.writeFile(dataPath, bricks.toString(), err => {
+            if (err) {
+                console.error('Error writing to file:', err);
+            }
+            else {
+                console.log(`Set bricks to ${bricks}`);
+            }
+        });
+    },
+
+    time: () => {
+        console.log(`Current time: ${new Date().toLocaleString()}`);
+    },
+
+    help: () => {
+        console.log('\nAvailable commands:');
+        Object.keys(commands).forEach(cmd => {
+            console.log(`  ${cmd}`);
+        });
+    },
+
+    exit: () => {
+        console.log('Goodbye!');
+        process.exit(0);
+    }
+};
+
+// Create an interface for input and output
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+// Function to parse and execute commands
+function executeCommand(input) {
+    const args = input.trim().split(/\s+/);
+    const command = args[0].toLowerCase();
+    const params = args.slice(1);
+
+    if (commands[command]) {
+        try {
+            commands[command](...params);
+        } catch (error) {
+            console.error(`Error executing command '${command}':`, error.message);
+        }
+    } else if (command === '') {
+        // Do nothing for empty input
+        return;
+    } else {
+        console.log(`Unknown command: '${command}'. Type 'help' for available commands.`);
+    }
+}
+
+// Main CLI loop
+function startCLI() {
+    console.log('Simple CLI started. Type "help" for commands or "exit" to quit.\n');
+
+    const prompt = () => {
+        rl.question('> ', (input) => {
+            executeCommand(input);
+            prompt(); // Continue the loop
+        });
+    };
+
+    // Override console methods to reprint prompt after logging
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+
+    console.log = (...args) => {
+        // Clear current line and move cursor to beginning
+        process.stdout.write('\r\x1b[K');
+        originalConsoleLog.apply(console, args);
+        // Reprint the prompt
+        process.stdout.write('> ');
+    };
+
+    console.error = (...args) => {
+        // Clear current line and move cursor to beginning
+        process.stdout.write('\r\x1b[K');
+        originalConsoleError.apply(console, args);
+        // Reprint the prompt
+        process.stdout.write('> ');
+    };
+
+    prompt();
+}
+
+// Handle Ctrl+C gracefully
+rl.on('SIGINT', () => {
+    console.log('\nReceived SIGINT. Goodbye!');
+    process.exit(0);
+});
+
+// Start the CLI
+startCLI();
