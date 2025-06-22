@@ -1,7 +1,6 @@
 const md5 = require("md5");
 const { Pool } = require('pg');
 
-// Neon PostgreSQL connection
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -9,7 +8,7 @@ const pool = new Pool({
     }
 });
 
-const otpkey = process.env.OTP_KEY; // Set this in Vercel environment variables
+const otpkey = process.env.OTP_KEY;
 const interval = 10;
 
 function MD5Hash(str) {
@@ -38,19 +37,20 @@ function CheckOTP(otp) {
     return (otp == currentOTP) || (otp == prevOTP);
 }
 
-function SuccessResponse(bricks, res) {
+function SuccessResponseBricks(bricks, res) {
+    res.status(200).send(bricks.toString());
+}
+
+function SuccessResponseTime(bricks, res) {
     const d = new Date();
     let time = d.getTime();
-
-    // Return the same format as original code
-    res.status(200).send(bricks.toString() + "," + time.toString());
+    res.status(200).send(time.toString());
 }
 
 function FailureResponse(res) {
     res.status(400).send("Error");
 }
 
-// Database functions using Neon PostgreSQL
 async function getBricks() {
     try {
         const client = await pool.connect();
@@ -105,15 +105,18 @@ export default async function handler(req, res) {
             if (CheckOTP(query.id)) {
                 const newBricks = await incrementBricks();
                 console.log(`Placed Brick ${newBricks} on ID: ${query.id}`);
-                SuccessResponse(newBricks, res);
+                SuccessResponseBricks(newBricks, res);
             } else {
                 console.log(`Error: Incorrect otp: ${query.id}`);
                 FailureResponse(res);
             }
-        } else {
+        } else if (query.time) {
+            SuccessResponseTime(newBricks, res);
+        }
+        else {
             // Handle root route - show current bricks
             const currentBricks = await getBricks();
-            SuccessResponse(currentBricks, res);
+            SuccessResponseBricks(currentBricks, res);
         }
     } catch (error) {
         console.error('Error:', error);
