@@ -149,8 +149,6 @@ export default async function handler(req, res) {
         if (query.place && query.id) {
             // Handle /place/:id route - place bricks
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
 
             if (CheckOTP(query.id)) {
                 const newBricks = await incrementBricks();
@@ -166,8 +164,6 @@ export default async function handler(req, res) {
         else {
             // Handle root route - show current bricks
             res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
-            res.setHeader('CDN-Cache-Control', 'public, max-age=60');
-            res.setHeader('Vercel-CDN-Cache-Control', 'public, max-age=60');
 
             const currentBricks = await getBricks();
             SuccessResponseBricks(currentBricks, res);
