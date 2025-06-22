@@ -11,6 +11,12 @@ const pool = new Pool({
 const otpkey = process.env.OTP_KEY;
 const interval = 10;
 
+// Cache objects with TTL
+const cache = {
+    bricks: { value: null, expires: 0 },
+    otp: { value: null, counter: null, expires: 0 }
+};
+
 function MD5Hash(str) {
     const hash = md5(str);
     return hash;
@@ -23,10 +29,26 @@ function CalculateCounter() {
 }
 
 function CalculateOTP(counter) {
+    const now = Date.now();
+
+    // Check if we have a cached OTP for this counter
+    if (cache.otp.counter === counter && cache.otp.expires > now) {
+        return cache.otp.value;
+    }
+
     let hashCode = MD5Hash(otpkey + counter);
     let firstFour = hashCode.slice(0, 4);
     let otp = Number("0x" + firstFour);
     otp = (otp & 511) + 1;
+
+    // Cache the OTP result for the remainder of the current interval
+    const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
+    cache.otp = {
+        value: otp,
+        counter: counter,
+        expires: nextIntervalStart
+    };
+
     return otp;
 }
 
@@ -52,17 +74,32 @@ function FailureResponse(res) {
 }
 
 async function getBricks() {
+    const now = Date.now();
+
+    // Check cache first
+    if (cache.bricks.expires > now && cache.bricks.value !== null) {
+        return cache.bricks.value;
+    }
+
     try {
         const client = await pool.connect();
         try {
             const result = await client.query('SELECT count FROM bricks WHERE id = 1');
-            return result.rows[0]?.count || 0;
+            const bricks = result.rows[0]?.count || 0;
+
+            // Cache the result for 60 seconds
+            cache.bricks = {
+                value: bricks,
+                expires: now + 60000
+            };
+
+            return bricks;
         } finally {
             client.release();
         }
     } catch (error) {
         console.error('Error getting bricks:', error);
-        return 0;
+        return cache.bricks.value || 0; // Return cached value if available
     }
 }
 
@@ -72,10 +109,19 @@ async function incrementBricks() {
         try {
             const result = await client.query(`
                 INSERT INTO bricks (id, count) VALUES (1, 1)
-                ON CONFLICT (id) DO UPDATE SET count = bricks.count + 1, updated_at = NOW()
-                RETURNING count
+                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + 1, updated_at = NOW()
+                                            RETURNING count
             `);
-            return result.rows[0].count;
+
+            const newCount = result.rows[0].count;
+
+            // Update cache immediately with new count
+            cache.bricks = {
+                value: newCount,
+                expires: Date.now() + 60000
+            };
+
+            return newCount;
         } finally {
             client.release();
         }
@@ -101,7 +147,11 @@ export default async function handler(req, res) {
 
     try {
         if (query.place && query.id) {
-            // Handle /place/:id route
+            // Handle /place/:id route - place bricks
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+
             if (CheckOTP(query.id)) {
                 const newBricks = await incrementBricks();
                 console.log(`Placed Brick ${newBricks} on ID: ${query.id}`);
@@ -115,6 +165,10 @@ export default async function handler(req, res) {
         }
         else {
             // Handle root route - show current bricks
+            res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
+            res.setHeader('CDN-Cache-Control', 'public, max-age=60');
+            res.setHeader('Vercel-CDN-Cache-Control', 'public, max-age=60');
+
             const currentBricks = await getBricks();
             SuccessResponseBricks(currentBricks, res);
         }
