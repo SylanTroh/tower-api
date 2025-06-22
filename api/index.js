@@ -111,7 +111,7 @@ export default async function handler(req, res) {
                 FailureResponse(res);
             }
         } else if (query.time) {
-            SuccessResponseTime(newBricks, res);
+            SuccessResponseTime(res);
         }
         else {
             // Handle root route - show current bricks
