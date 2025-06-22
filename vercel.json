@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/place/:id",
+      "destination": "/api/index?place=true&id=:id"
+    }
+  ]
+}
