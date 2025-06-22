@@ -12,7 +12,7 @@ const pool = new Pool({
 const otpkey = process.env.OTP_KEY; // Set this in Vercel environment variables
 const interval = 10;
 
-console.log(otpkey);
+console.log("OTPKEY: " + otpkey);
 
 function MD5Hash(str) {
     const hash = md5(str);
