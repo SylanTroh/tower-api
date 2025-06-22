@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -48,6 +46,7 @@
       <workItem from="1750559398155" duration="4115000" />
       <workItem from="1750590256644" duration="609000" />
       <workItem from="1750593173351" duration="715000" />
+      <workItem from="1750595179445" duration="455000" />
     </task>
     <task id="LOCAL-00001" summary="Separate Time API">
       <option name="closed" value="true" />

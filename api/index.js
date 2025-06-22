@@ -39,7 +39,7 @@ function CalculateOTP(counter) {
     let hashCode = MD5Hash(otpkey + counter);
     let firstFour = hashCode.slice(0, 4);
     let otp = Number("0x" + firstFour);
-    otp = (otp & 511) + 1;
+    otp = (otp & 1023) + 1;
 
     // Cache the OTP result for the remainder of the current interval
     const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
