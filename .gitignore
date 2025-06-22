@@ -143,3 +143,5 @@ dist
 api/key.txt
 api/numBricks.txt
 api/saveBricks.txt
+test/
+test/*
