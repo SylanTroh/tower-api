@@ -41,7 +41,7 @@ function SuccessResponseBricks(bricks, res) {
     res.status(200).send(bricks.toString());
 }
 
-function SuccessResponseTime(bricks, res) {
+function SuccessResponseTime(res) {
     const d = new Date();
     let time = d.getTime();
     res.status(200).send(time.toString());
