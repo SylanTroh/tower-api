@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="" />
+    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/index.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -47,6 +50,8 @@
       <workItem from="1750590256644" duration="609000" />
       <workItem from="1750593173351" duration="715000" />
       <workItem from="1750595179445" duration="455000" />
+      <workItem from="1750614172549" duration="74000" />
+      <workItem from="1750867626221" duration="1378000" />
     </task>
     <task id="LOCAL-00001" summary="Separate Time API">
       <option name="closed" value="true" />
@@ -72,7 +77,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750593633454</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Increase OTP to 1024">
+      <option name="closed" value="true" />
+      <created>1750614227550</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1750614227550</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -96,7 +109,8 @@
     <MESSAGE value="Separate Time API" />
     <MESSAGE value="Fix Time Function" />
     <MESSAGE value="Add Edge Caching" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add Edge Caching" />
+    <MESSAGE value="Increase OTP to 1024" />
+    <option name="LAST_COMMIT_MESSAGE" value="Increase OTP to 1024" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

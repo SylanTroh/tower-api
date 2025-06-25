@@ -70,7 +70,15 @@ function SuccessResponseTime(res) {
 }
 
 function FailureResponse(res) {
-    res.status(400).send("Error");
+    res.status(400).send("Hi! This is Sylan!\n" +
+        "If you're here, that means you're poking around at the server for my tower world. \n" +
+        "It's pretty cool that you've managed to get here, I myself love to tinker around with things and figure out how they work, but I would like to please ask you to consider the following before poking any further:\n" +
+        "I made this world because I wanted to make a fun experience that brings people together. \n" +
+        "To accomplish this, I pay for the server that makes this possible out of pocket, and I am more than willing to do so because it makes me happy to see others having fun. \n" +
+        "I don't make any money from this world, and this means that if bots, or users outside of VR decide to flood the server with requests, I will likely not be able to afford to keep it running anymore, and I will probably have to shut down this world for everyone.\n" +
+        "While I can't possibly know your intentions, I hope you can keep that in mind if you decide to continue poking around here.\n" +
+        "\n" +
+        "- Sylan");
 }
 
 async function getBricks() {
