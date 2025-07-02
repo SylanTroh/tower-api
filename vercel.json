@@ -9,6 +9,10 @@
       "destination": "/api/index?place=true&id=:id"
     },
     {
+      "source": "/place3/:id",
+      "destination": "/api/index?place3=true&id=:id"
+    },
+    {
       "source": "/time",
       "destination": "/api/index?time=true"
     }

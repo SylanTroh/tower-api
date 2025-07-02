@@ -29,6 +29,7 @@ function CalculateCounter() {
 }
 
 function CalculateOTP(counter) {
+    //This is not meant to be secure. I just need a stable hash
     const now = Date.now();
 
     // Check if we have a cached OTP for this counter
@@ -111,13 +112,13 @@ async function getBricks() {
     }
 }
 
-async function incrementBricks() {
+async function incrementBricks(num) {
     try {
         const client = await pool.connect();
         try {
             const result = await client.query(`
                 INSERT INTO bricks (id, count) VALUES (1, 1)
-                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + 1, updated_at = NOW()
+                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + num, updated_at = NOW()
                                             RETURNING count
             `);
 
@@ -159,14 +160,27 @@ export default async function handler(req, res) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
             if (CheckOTP(query.id)) {
-                const newBricks = await incrementBricks();
+                const newBricks = await incrementBricks(1);
                 console.log(`Placed Brick ${newBricks} on ID: ${query.id}`);
                 SuccessResponseBricks(newBricks, res);
             } else {
                 console.log(`Error: Incorrect otp: ${query.id}`);
                 FailureResponse(res);
             }
-        } else if (query.time) {
+        }         
+        if (query.place3 && query.id) {
+            // Handle /place3/:id route - place three bricks
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+            if (CheckOTP(query.id)) {
+                const newBricks = await incrementBricks(3);
+                console.log(`Placed Three Bricks ${newBricks} on ID: ${query.id}`);
+                SuccessResponseBricks(newBricks, res);
+            } else {
+                console.log(`Error: Incorrect otp: ${query.id}`);
+                FailureResponse(res);
+        }
+        else if (query.time) {
             SuccessResponseTime(res);
         }
         else {
