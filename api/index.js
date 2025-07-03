@@ -270,6 +270,32 @@ function startServer() {
     });
 }
 
+async function PlaceBrick(num, res, req) {
+    try {
+        await writeQueue.enqueue(async () => {
+            return await incrementBricks(num);
+        });
+
+        const currentBricks = await getBricks();
+        console.log(`Placed ${num} brick(s). Total: ${currentBricks} on ID: ${req.params.id}`);
+        SuccessResponseBricks(currentBricks, res, req);
+    } catch (error) {
+        console.error('Error placing brick:', error);
+        FailureResponse(res, req);
+    }
+}
+
+async function SaveBricks() {
+    try {
+        await writeQueue.enqueue(async () => {
+            return await logBricks();
+        });
+    } catch (error) {
+        console.error('Error saving bricks:', error);
+    }
+}
+
+
 /// Console Prompt
 
 const commands = {
