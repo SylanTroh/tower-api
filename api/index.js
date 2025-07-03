@@ -15,6 +15,15 @@ const pool = new Pool({
     password: process.env.PGPASSWORD, // optional if using peer auth
 });
 
+// Environment variables
+const otpkey = process.env.OTP_KEY;
+const interval = 10;
+
+if (!otpkey) {
+    console.error('OTP_KEY environment variable is required');
+    process.exit(1);
+}
+
 // General rate limiter
 const generalLimiter = rateLimit({
     windowMs: 15 * 1000,
@@ -32,10 +41,6 @@ const generalLimiter = rateLimit({
 
 // Apply general rate limiting to all routes
 app.use(generalLimiter);
-
-//This is not a security-critical application, I just need a stable hash
-const otpkey = process.env.OTPKEY;
-const interval = 10;
 
 // Cache objects with TTL
 const cache = {
@@ -416,21 +421,6 @@ async function initializeDatabase() {
         console.error('Error initializing database:', error);
         process.exit(1);
     }
-}
-
-
-// Environment variables
-const otpkey = process.env.OTP_KEY;
-const interval = 10;
-
-if (!otpkey) {
-    console.error('OTP_KEY environment variable is required');
-    process.exit(1);
-}
-
-if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL environment variable is required');
-    process.exit(1);
 }
 
 // Start The Server
