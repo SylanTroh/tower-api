@@ -142,7 +142,7 @@ function CalculateOTP(counter){
     let hashCode = MD5Hash(otpkey + counter);
     let firstFour = hashCode.slice(0,4);
     let otp = Number("0x"+firstFour);
-    otp = (otp & 1024) + 1;
+    otp = (otp & 1023) + 1;
     return otp;
 }
 
