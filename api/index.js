@@ -118,7 +118,7 @@ async function incrementBricks(num) {
         try {
             const result = await client.query(`
                 INSERT INTO bricks (id, count) VALUES (1, 1)
-                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + num, updated_at = NOW()
+                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + ${num}, updated_at = NOW()
                                             RETURNING count
             `);
 
