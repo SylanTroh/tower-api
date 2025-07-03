@@ -42,6 +42,44 @@ const generalLimiter = rateLimit({
 // Apply general rate limiting to all routes
 app.use(generalLimiter);
 
+// Write queue to handle race conditions
+class WriteQueue {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
+    async enqueue(operation) {
+        return new Promise((resolve, reject) => {
+            this.queue.push({ operation, resolve, reject });
+            this.process();
+        });
+    }
+
+    async process() {
+        if (this.isProcessing || this.queue.length === 0) {
+            return;
+        }
+
+        this.isProcessing = true;
+
+        while (this.queue.length > 0) {
+            const { operation, resolve, reject } = this.queue.shift();
+
+            try {
+                const result = await operation();
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        }
+
+        this.isProcessing = false;
+    }
+}
+
+const writeQueue = new WriteQueue();
+
 // Cache objects with TTL
 const cache = {
     bricks: { value: null, expires: 0 },
@@ -53,7 +91,7 @@ function MD5Hash(str) {
     return hash;
 }
 
-function CalculateCounter(){
+function CalculateCounter() {
     const d = new Date();
     let timeInSeconds = Math.floor(d.getTime() / 1000);
     return Math.floor(timeInSeconds / interval);
@@ -90,7 +128,6 @@ function CheckOTP(otp){
     let prevOTP = CalculateOTP(counter-1);
     return (otp == currentOTP) || (otp == prevOTP)
 }
-
 
 function SuccessResponseBricks(bricks, res, req) {
     res.status(200).send(bricks.toString());
