@@ -97,41 +97,11 @@ app.get('/place3/:id', (req, res) => {
 
 
 function startServer() {
-    const servers = [];
+    const port = process.env.PORT || 3000;
 
-    try {
-        // Create HTTPS server
-        const httpsServer = https.createServer(
-            {
-                key: fs.readFileSync(".ssl/key.pem"),
-                cert: fs.readFileSync(".ssl/cert.pem"),
-            },
-            app
-        );
-
-        httpsServer.listen(443, () => {
-            console.log('HTTPS Server listening on port 443');
-        });
-
-        servers.push(httpsServer);
-    } catch (error) {
-        console.error('Failed to start HTTPS server:', error.message);
-    }
-
-    try {
-        // Create HTTP server
-        const httpServer = http.createServer(app);
-
-        httpServer.listen(80, () => {
-            console.log('HTTP Server listening on port 80');
-        });
-
-        servers.push(httpServer);
-    } catch (error) {
-        console.error('Failed to start HTTP server:', error.message);
-    }
-
-    return servers;
+    app.listen(port, () => {
+        console.log(`App is running behind Nginx on port ${port}`);
+    });
 }
 
 function SuccessResponseBricks(bricks, res, req) {
@@ -365,6 +335,6 @@ const interval = 10;
 
 // Start The Server
 console.log('Starting Server');
-const servers = startServer();
+startServer();
 startCLI();
 const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);
