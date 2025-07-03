@@ -4,7 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="" />
+    <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -12,6 +14,9 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/../../../VR/Worlds/The Tower/Assets/Scripts/StringDownloader/TowerStringDownloader.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="ProjectColorInfo">{
@@ -45,7 +50,7 @@
       <updated>1750559396489</updated>
       <workItem from="1750559398155" duration="2948000" />
       <workItem from="1751509696522" duration="535000" />
-      <workItem from="1751510256657" duration="10484000" />
+      <workItem from="1751510256657" duration="16776000" />
     </task>
     <servers />
   </component>
