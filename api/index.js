@@ -24,23 +24,23 @@ if (!otpkey) {
     process.exit(1);
 }
 
-// General rate limiter
-const generalLimiter = rateLimit({
-    windowMs: 15 * 1000,
-    max: 4, // Limit each IP to 4 requests per 15 seconds
-    message: {
-        error: 'Too many requests from this IP, please try again later.',
-        retryAfter: '15 seconds'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => {
-        return req.ip;
-    }
-});
-
-// Apply general rate limiting to all routes
-app.use(generalLimiter);
+// // General rate limiter
+// const generalLimiter = rateLimit({
+//     windowMs: 15 * 1000,
+//     max: 4, // Limit each IP to 4 requests per 15 seconds
+//     message: {
+//         error: 'Too many requests from this IP, please try again later.',
+//         retryAfter: '15 seconds'
+//     },
+//     standardHeaders: true,
+//     legacyHeaders: false,
+//     keyGenerator: (req) => {
+//         return req.ip;
+//     }
+// });
+//
+// // Apply general rate limiting to all routes
+// app.use(generalLimiter);
 
 // Write queue to handle race conditions
 class WriteQueue {
