@@ -167,8 +167,21 @@ export default async function handler(req, res) {
                 console.log(`Error: Incorrect otp: ${query.id}`);
                 FailureResponse(res);
             }
-        }         
-        if (query.placethree && query.id) {
+        }
+        else if (query.placetwo && query.id) {
+            // Handle /place2/:id route - place three bricks
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+            if (CheckOTP(query.id)) {
+                const newBricks = await incrementBricks(2);
+                console.log(`Placed Two Bricks ${newBricks} on ID: ${query.id}`);
+                SuccessResponseBricks(newBricks, res);
+            } else {
+                console.log(`Error: Incorrect otp: ${query.id}`);
+                FailureResponse(res);
+            }
+        }
+        else if (query.placethree && query.id) {
             // Handle /place3/:id route - place three bricks
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
