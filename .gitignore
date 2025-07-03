@@ -145,3 +145,5 @@ api/numBricks.txt
 api/saveBricks.txt
 test/
 test/*
+
+.env
