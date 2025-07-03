@@ -1,26 +1,30 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const http = require('http');
-const https = require('https');
-const fs = require('fs');
 const md5 = require("md5");
 const readline = require('readline');
-
-const dataPath = 'api/numBricks.txt';
-const backupPath = 'api/saveBricks.txt';
+const { Pool } = require('pg');
+const env = require('dotenv').config();
 
 const app = express();
 
+const pool = new Pool({
+    user: process.env.PGUSER,
+    host: process.env.PGHOST,
+    database: process.env.PGDATABASE,
+    port: process.env.PGPORT,
+    password: process.env.PGPASSWORD, // optional if using peer auth
+});
+
 // General rate limiter
 const generalLimiter = rateLimit({
-    windowMs: 14 * 1000,
-    max: 3, // Limit each IP to 3 requests per 14 seconds
+    windowMs: 15 * 1000,
+    max: 4, // Limit each IP to 4 requests per 15 seconds
     message: {
         error: 'Too many requests from this IP, please try again later.',
         retryAfter: '15 seconds'
     },
     standardHeaders: true,
-    legacyHeaders: false, 
+    legacyHeaders: false,
     keyGenerator: (req) => {
         return req.ip;
     }
@@ -29,80 +33,59 @@ const generalLimiter = rateLimit({
 // Apply general rate limiting to all routes
 app.use(generalLimiter);
 
-// Write queue to handle race conditions
-class WriteQueue {
-    constructor() {
-        this.queue = [];
-        this.isProcessing = false;
-    }
+//This is not a security-critical application, I just need a stable hash
+const otpkey = process.env.OTPKEY;
+const interval = 10;
 
-    async enqueue(operation) {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ operation, resolve, reject });
-            this.process();
-        });
-    }
+// Cache objects with TTL
+const cache = {
+    bricks: { value: null, expires: 0 },
+    otp: { value: null, counter: null, expires: 0 }
+};
 
-    async process() {
-        if (this.isProcessing || this.queue.length === 0) {
-            return;
-        }
-
-        this.isProcessing = true;
-
-        while (this.queue.length > 0) {
-            const { operation, resolve, reject } = this.queue.shift();
-
-            try {
-                const result = await operation();
-                resolve(result);
-            } catch (error) {
-                reject(error);
-            }
-        }
-
-        this.isProcessing = false;
-    }
+function MD5Hash(str) {
+    const hash = md5(str);
+    return hash;
 }
 
-const writeQueue = new WriteQueue();
-
-//Show Current Bricks
-app.get('/', (req, res) => {
-    SuccessResponseBricks(bricks,res,req);
-});
-
-//Show Server Time
-app.get('/time', (req, res) => {
-    SuccessResponseTime(res,req);
-});
-
-//Add One Brick
-app.get('/place/:id', (req, res) => {
-    if(CheckOTP(req.params.id)) { PlaceBrick(1,res,req);}
-    else { FailureResponse(res,req);}
-});
-
-//Add Two Bricks
-app.get('/place2/:id', (req, res) => {
-    if(CheckOTP(req.params.id)) { PlaceBrick(2,res,req);}
-    else { FailureResponse(res,req);}
-});
-
-//Add Three Bricks
-app.get('/place3/:id', (req, res) => {
-    if(CheckOTP(req.params.id)) { PlaceBrick(3,res,req);}
-    else { FailureResponse(res,req);}
-});
-
-
-function startServer() {
-    const port = process.env.PORT || 3000;
-
-    app.listen(port, () => {
-        console.log(`App is running behind Nginx on port ${port}`);
-    });
+function CalculateCounter(){
+    const d = new Date();
+    let timeInSeconds = Math.floor(d.getTime() / 1000);
+    return Math.floor(timeInSeconds / interval);
 }
+
+function CalculateOTP(counter) {
+    //This is not meant to be secure. I just need a stable hash
+    const now = Date.now();
+
+    // Check if we have a cached OTP for this counter
+    if (cache.otp.counter === counter && cache.otp.expires > now) {
+        return cache.otp.value;
+    }
+
+    let hashCode = MD5Hash(otpkey + counter);
+    let firstFour = hashCode.slice(0, 4);
+    let otp = Number("0x" + firstFour);
+    otp = (otp & 1023) + 1;
+
+    // Cache the OTP result for the remainder of the current interval
+    const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
+    cache.otp = {
+        value: otp,
+        counter: counter,
+        expires: nextIntervalStart
+    };
+
+    return otp;
+}
+
+function CheckOTP(otp){
+    let counter = CalculateCounter()
+    let currentOTP = CalculateOTP(counter);
+    let prevOTP = CalculateOTP(counter-1);
+    return (otp == currentOTP) || (otp == prevOTP)
+}
+
 
 function SuccessResponseBricks(bricks, res, req) {
     res.status(200).send(bricks.toString());
@@ -127,81 +110,159 @@ function FailureResponse(res,req){
         "- Sylan</p>");
 }
 
-function MD5Hash(str) {
-      const hash = md5(str);
-      return hash;
-}
+async function getBricks() {
+    const now = Date.now();
 
-function CalculateCounter(){
-    const d = new Date();
-    let timeInSeconds = Math.floor(d.getTime() / 1000);
-    return Math.floor(timeInSeconds / interval);
-}
+    // Check cache first
+    if (cache.bricks.expires > now && cache.bricks.value !== null) {
+        return cache.bricks.value;
+    }
 
-function CalculateOTP(counter){
-    let hashCode = MD5Hash(otpkey + counter);
-    let firstFour = hashCode.slice(0,4);
-    let otp = Number("0x"+firstFour);
-    otp = (otp & 1023) + 1;
-    return otp;
-}
-
-function CheckOTP(otp){
-    let counter = CalculateCounter()
-    let currentOTP = CalculateOTP(counter);
-    let prevOTP = CalculateOTP(counter-1);
-    return (otp == currentOTP) || (otp == prevOTP)
-}
-
-async function PlaceBrick(num, res, req) {
     try {
-        await writeQueue.enqueue(async () => {
-            // Increment bricks in memory
-            bricks += num;
+        const client = await pool.connect();
+        try {
+            const result = await client.query('SELECT count FROM bricks WHERE id = 1');
+            const bricks = result.rows[0]?.count || 0;
 
-            // Write to file using promises
-            return new Promise((resolve, reject) => {
-                fs.writeFile(dataPath, bricks.toString(), err => {
-                    if (err) {
-                        // Rollback the in-memory change on error
-                        bricks -= num;
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
-        });
+            // Cache the result for 60 seconds
+            cache.bricks = {
+                value: bricks,
+                expires: now + 60000
+            };
 
-        console.log(`Placed ${num} brick(s). Total: ${bricks} on ID: ${req.params.id}`);
-        SuccessResponseBricks(bricks, res, req);
+            return bricks;
+        } finally {
+            client.release();
+        }
     } catch (error) {
-        console.error('Error placing brick:', error);
+        console.error('Error getting bricks:', error);
+        return cache.bricks.value || 0; // Return cached value if available
+    }
+}
+
+async function incrementBricks(num) {
+    try {
+        const client = await pool.connect();
+        try {
+            const result = await client.query(`
+                INSERT INTO bricks (id, count) VALUES (1, $1)
+                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + $1, updated_at = NOW()
+                                            RETURNING count
+            `, [num]);
+
+            const newCount = result.rows[0].count;
+
+            // Update cache immediately with new count
+            cache.bricks = {
+                value: newCount,
+                expires: Date.now() + 60000
+            };
+
+            return newCount;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error incrementing bricks:', error);
+        throw error;
+    }
+}
+
+async function setBricks(num) {
+    try {
+        const client = await pool.connect();
+        try {
+            const result = await client.query(`
+                INSERT INTO bricks (id, count) VALUES (1, $1)
+                    ON CONFLICT (id) DO UPDATE SET count = $1, updated_at = NOW()
+                                            RETURNING count
+            `, [num]);
+
+            const newCount = result.rows[0].count;
+
+            // Update cache immediately with new count
+            cache.bricks = {
+                value: newCount,
+                expires: Date.now() + 60000
+            };
+
+            return newCount;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error setting bricks:', error);
+        throw error;
+    }
+}
+
+async function logBricks() {
+    try {
+        const client = await pool.connect();
+        try {
+            const bricks = await getBricks();
+            await client.query(`
+                INSERT INTO brick_logs (logged_at, count) VALUES (NOW(), $1)
+            `, [bricks]);
+
+            console.log(`Logged ${bricks} bricks`);
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error logging bricks:', error);
+    }
+}
+
+//Show Current Bricks
+app.get('/', async (req, res) => {
+    try {
+        const currentBricks = await getBricks();
+        SuccessResponseBricks(currentBricks, res, req);
+    } catch (error) {
+        console.error('Error getting bricks:', error);
         FailureResponse(res, req);
     }
-}
+});
 
-async function SaveBricks(){
-    try {
-        await writeQueue.enqueue(async () => {
-            return new Promise((resolve, reject) => {
-                const timestamp = new Date().toISOString();
-                const backupEntry = `${timestamp}: ${bricks}\n`;
-                
-                fs.appendFile(backupPath, backupEntry, err => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
-        });
+//Show Server Time
+app.get('/time', (req, res) => {
+    SuccessResponseTime(res,req);
+});
 
-        console.log(`Logged ${bricks} bricks`);
-    } catch (error) {
-        console.error('Error saving bricks:', error);
+//Add One Brick
+app.get('/place/:id', async (req, res) => {
+    if(CheckOTP(req.params.id)) {
+        await PlaceBrick(1, res, req);
+    } else {
+        FailureResponse(res, req);
     }
+});
+
+//Add Two Bricks
+app.get('/place2/:id', async (req, res) => {
+    if(CheckOTP(req.params.id)) {
+        await PlaceBrick(2, res, req);
+    } else {
+        FailureResponse(res, req);
+    }
+});
+
+//Add Three Bricks
+app.get('/place3/:id', async (req, res) => {
+    if(CheckOTP(req.params.id)) {
+        await PlaceBrick(3, res, req);
+    } else {
+        FailureResponse(res, req);
+    }
+});
+
+function startServer() {
+    const port = process.env.PORT || 3000;
+
+    app.listen(port, () => {
+        console.log(`App is running behind Nginx on port ${port}`);
+    });
 }
 
 /// Console Prompt
@@ -216,21 +277,21 @@ const commands = {
 
         try {
             await writeQueue.enqueue(async () => {
-                bricks = newBricks;
-                return new Promise((resolve, reject) => {
-                    fs.writeFile(dataPath, bricks.toString(), err => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve();
-                        }
-                    });
-                });
+                return await setBricks(newBricks);
             });
 
-            console.log(`Set bricks to ${bricks}`);
+            console.log(`Set bricks to ${newBricks}`);
         } catch (error) {
             console.error('Error setting bricks:', error);
+        }
+    },
+
+    getbricks: async () => {
+        try {
+            const currentBricks = await getBricks();
+            console.log(`Current bricks: ${currentBricks}`);
+        } catch (error) {
+            console.error('Error getting bricks:', error);
         }
     },
 
@@ -317,24 +378,82 @@ rl.on('SIGINT', () => {
     process.exit(0);
 });
 
+// Initialize database connection and create tables if needed
+async function initializeDatabase() {
+    try {
+        const client = await pool.connect();
+        try {
+            // Create bricks table if it doesn't exist
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS bricks (
+                    id INTEGER PRIMARY KEY,
+                    count INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            `);
 
-// Initialize Bricks
-let bricks = 0;
-try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    bricks = parseInt(data) || 0;
-    console.log(`Read Bricks from File: ${bricks}`);
-} catch (err) {
-    console.error('Error reading bricks file:', err);
+            // Create brick_logs table if it doesn't exist
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS brick_logs (
+                    id SERIAL PRIMARY KEY,
+                    logged_at TIMESTAMP DEFAULT NOW(),
+                    count INTEGER NOT NULL
+                )
+            `);
+
+            // Initialize the brick count if it doesn't exist
+            await client.query(`
+                INSERT INTO bricks (id, count) VALUES (1, 0)
+                ON CONFLICT (id) DO NOTHING
+            `);
+
+            console.log('Database initialized successfully');
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Error initializing database:', error);
+        process.exit(1);
+    }
 }
 
-//This is not a security-critical application, I just need a stable hash
-const keyPath = 'api/key.txt';
-const otpkey = fs.readFileSync(keyPath, 'utf-8').split(/\n/g)[0];
+
+// Environment variables
+const otpkey = process.env.OTP_KEY;
 const interval = 10;
 
+if (!otpkey) {
+    console.error('OTP_KEY environment variable is required');
+    process.exit(1);
+}
+
+if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL environment variable is required');
+    process.exit(1);
+}
+
 // Start The Server
-console.log('Starting Server');
-startServer();
-startCLI();
-const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);
+async function main() {
+    console.log('Initializing database...');
+    await initializeDatabase();
+
+    console.log('Starting Server');
+    startServer();
+    startCLI();
+
+    // Set up periodic brick logging
+    const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+        console.log('Received SIGTERM, shutting down gracefully...');
+        clearInterval(saveInterval);
+        pool.end(() => {
+            console.log('Database pool closed');
+            process.exit(0);
+        });
+    });
+}
+
+main().catch(console.error);
