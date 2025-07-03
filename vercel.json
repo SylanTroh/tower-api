@@ -10,7 +10,7 @@
     },
     {
       "source": "/place3/:id",
-      "destination": "/api/index?place3=true&id=:id"
+      "destination": "/api/index?placethree=true&id=:id"
     },
     {
       "source": "/time",

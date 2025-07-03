@@ -168,7 +168,7 @@ export default async function handler(req, res) {
                 FailureResponse(res);
             }
         }         
-        if (query.place3 && query.id) {
+        if (query.placethree && query.id) {
             // Handle /place3/:id route - place three bricks
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
@@ -179,6 +179,7 @@ export default async function handler(req, res) {
             } else {
                 console.log(`Error: Incorrect otp: ${query.id}`);
                 FailureResponse(res);
+            }
         }
         else if (query.time) {
             SuccessResponseTime(res);
