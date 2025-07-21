@@ -7,22 +7,38 @@ const env = require('dotenv').config();
 
 const app = express();
 
+// Trust proxy to get real IP addresses
+app.set('trust proxy', true);
+
 const pool = new Pool({
     user: process.env.PGUSER,
     host: process.env.PGHOST,
     database: process.env.PGDATABASE,
     port: process.env.PGPORT,
-    password: process.env.PGPASSWORD, // optional if using peer auth
+    password: process.env.PGPASSWORD,
 });
 
 // Environment variables
 const otpkey = process.env.OTP_KEY;
 const interval = 10;
 
+// IP blocking configuration
+// Temporarily blocks ips that submit too many failed OTPs
+const IP_BLOCK_CONFIG = {
+    maxFailedAttempts: 3,
+    timeWindowMinutes: 3,
+    blockDurationMinutes: 1,
+    cleanupIntervalMinutes: 30
+};
+
 if (!otpkey) {
     console.error('OTP_KEY environment variable is required');
     process.exit(1);
 }
+
+// In-memory storage for failed attempts and blocked IPs
+const ipFailures = new Map(); // ip -> { count, firstAttempt, lastAttempt }
+const blockedIPs = new Map(); // ip -> { blockedAt, unblockAt }
 
 // Write queue to handle race conditions
 class WriteQueue {
@@ -65,8 +81,134 @@ const writeQueue = new WriteQueue();
 // Cache objects with TTL
 const cache = {
     bricks: { value: null, expires: 0 },
-    otps: new Map()
+    otp: { value: null, counter: null, expires: 0 }
 };
+
+//Due to the limitations of VRChat, I cannot truly make this API secure. So we ask nicely
+const asknicely = "<p>Hi! This is Sylan!<br>" +
+    "If you're here, that means you're poking around at the server for my tower world.<br>" +
+    "It's pretty cool that you've managed to get here, I myself love to tinker around with things and figure out how they work, but I would like to please ask you to consider the following before poking any further:<br>" +
+    "I made this world because I wanted to make a fun experience that brings people together.<br>" +
+    "To accomplish this, I pay for the server that makes this possible out of pocket, and I am more than willing to do so because it makes me happy to see others having fun.<br>" +
+    "I don't make any money from this world. This means that if bots or users outside VR decide to flood the server with requests, I will likely not be able to afford to keep it running anymore, shutting it down for everyone.<br>" +
+    "While I can't possibly know your intentions, I hope you can keep that in mind if you decide to continue poking around here.<br>" +
+    "<br>" +
+    "- Sylan</p>"
+
+// IP blocking functions
+function getClientIP(req) {
+    return req.ip || req.connection.remoteAddress || 'unknown';
+}
+
+function isIPBlocked(ip) {
+    const blocked = blockedIPs.get(ip);
+    if (!blocked) return false;
+
+    const now = Date.now();
+    if (now >= blocked.unblockAt) {
+        // Block has expired, remove it
+        blockedIPs.delete(ip);
+        return false;
+    }
+
+    return true;
+}
+
+function recordFailedAttempt(ip) {
+    const now = Date.now();
+    const timeWindowMs = IP_BLOCK_CONFIG.timeWindowMinutes * 60 * 1000;
+    const existing = ipFailures.get(ip);
+
+    if (existing) {
+        // Filter out attempts older than the time window
+        existing.attempts = existing.attempts.filter(attemptTime => now - attemptTime < timeWindowMs);
+        // Add the current attempt
+        existing.attempts.push(now);
+        existing.lastAttempt = now;
+    } else {
+        ipFailures.set(ip, {
+            attempts: [now],
+            firstAttempt: now,
+            lastAttempt: now
+        });
+    }
+
+    const failure = ipFailures.get(ip);
+
+    // Check if we should block this IP
+    if (failure.attempts.length >= IP_BLOCK_CONFIG.maxFailedAttempts) {
+        const blockDurationMs = IP_BLOCK_CONFIG.blockDurationMinutes * 60 * 1000;
+        blockedIPs.set(ip, {
+            blockedAt: now,
+            unblockAt: now + blockDurationMs
+        });
+
+        console.log(`IP ${ip} blocked for ${IP_BLOCK_CONFIG.blockDurationMinutes} minutes after ${failure.attempts.length} failed attempts within ${IP_BLOCK_CONFIG.timeWindowMinutes} minutes`);
+    }
+}
+
+function recordSuccessfulAttempt(ip) {
+    // Clear any failed attempts for this IP on successful OTP
+    ipFailures.delete(ip);
+}
+
+// Cleanup expired failures periodically
+function cleanupExpiredFailures() {
+    const now = Date.now();
+    const timeWindowMs = IP_BLOCK_CONFIG.timeWindowMinutes * 60 * 1000;
+
+    for (const [ip, failure] of ipFailures.entries()) {
+        // Filter out old attempts
+        failure.attempts = failure.attempts.filter(attemptTime => now - attemptTime < timeWindowMs);
+
+        // Remove the entry if no attempts remain in the window
+        if (failure.attempts.length === 0) {
+            ipFailures.delete(ip);
+        }
+    }
+
+    // Also cleanup expired blocks
+    for (const [ip, block] of blockedIPs.entries()) {
+        if (now >= block.unblockAt) {
+            blockedIPs.delete(ip);
+        }
+    }
+}
+
+// Check if IP is blocked
+function checkIPBlocked(req, res, next) {
+    const ip = getClientIP(req);
+
+    if (isIPBlocked(ip)) {
+        const blocked = blockedIPs.get(ip);
+        const remainingTime = Math.ceil((blocked.unblockAt - Date.now()) / (60 * 1000));
+
+        console.log(`Blocked IP ${ip} attempted access. ${remainingTime} minutes remaining.`);
+
+        res.status(400).send(asknicely);
+        return;
+    }
+
+    next();
+}
+
+async function logIPAttempt(ip, otp, success, endpoint) {
+    try {
+        await writeQueue.enqueue(async () => {
+            const client = await pool.connect();
+            try {
+                await client.query(`
+                    INSERT INTO ip_logs (ip_address, otp_attempted, success, endpoint, attempted_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                `, [ip, otp, success, endpoint]);
+            } finally {
+                client.release();
+            }
+        });
+    } catch (error) {
+        console.error('Error logging IP attempt:', error);
+    }
+}
 
 function MD5Hash(str) {
     const hash = md5(str);
@@ -84,9 +226,8 @@ function CalculateOTP(counter) {
     const now = Date.now();
 
     // Check if we have a cached OTP for this counter
-    const cachedOtp = cache.otps.get(counter);
-    if (cachedOtp && cachedOtp.expires > now) {
-        return cachedOtp.value;
+    if (cache.otp.counter === counter && cache.otp.expires > now) {
+        return cache.otp.value;
     }
 
     let hashCode = MD5Hash(otpkey + counter);
@@ -96,22 +237,13 @@ function CalculateOTP(counter) {
 
     // Cache the OTP result for the remainder of the current interval
     const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
-    cache.otps.set(counter, {
+    cache.otp = {
         value: otp,
+        counter: counter,
         expires: nextIntervalStart
-    });
+    };
 
     return otp;
-}
-
-function CleanupCache() {
-    //Remove expired entries in the cache. Only OTPs for now
-    const now = Date.now();
-    for (const [counter, otpData] of cache.otps.entries()) {
-        if (otpData.expires <= now) {
-            cache.otps.delete(counter);
-        }
-    }
 }
 
 function CheckOTP(otp){
@@ -131,17 +263,16 @@ function SuccessResponseTime(res, req) {
     res.status(200).send(time.toString());
 }
 
-function FailureResponse(res,req){
-    console.log(`Error: Incorrect otp: ${req.params.id}`);
-    res.status(400).send("<p>Hi! This is Sylan!<br>" +
-        "If you're here, that means you're poking around at the server for my tower world.<br>" +
-        "It's pretty cool that you've managed to get here, I myself love to tinker around with things and figure out how they work, but I would like to please ask you to consider the following before poking any further:<br>" +
-        "I made this world because I wanted to make a fun experience that brings people together.<br>" +
-        "To accomplish this, I pay for the server that makes this possible out of pocket, and I am more than willing to do so because it makes me happy to see others having fun.<br>" +
-        "I don't make any money from this world. This means that if bots or users outside VR decide to flood the server with requests, I will likely not be able to afford to keep it running anymore, shutting it down for everyone.<br>" +
-        "While I can't possibly know your intentions, I hope you can keep that in mind if you decide to continue poking around here.<br>" +
-        "<br>" +
-        "- Sylan</p>");
+function FailureResponse(res, req, logAttempt = true) {
+    const ip = getClientIP(req);
+
+    if (logAttempt) {
+        recordFailedAttempt(ip);
+        logIPAttempt(ip, req.params.id, false, req.path);
+    }
+
+    console.log(`Error: Incorrect otp: ${req.params.id} from IP: ${ip}`);
+    res.status(400).send(asknicely);
 }
 
 async function getBricks() {
@@ -179,11 +310,10 @@ async function incrementBricks(num) {
         const client = await pool.connect();
         try {
             const result = await client.query(`
-                        INSERT INTO bricks (id, count)
-                        VALUES (1, $1) ON CONFLICT (id) DO
-                        UPDATE SET count = bricks.count + $1, updated_at = NOW()
-                            RETURNING count
-                `, [num]);
+                INSERT INTO bricks (id, count) VALUES (1, $1)
+                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + $1, updated_at = NOW()
+                                            RETURNING count
+            `, [num]);
 
             const newCount = result.rows[0].count;
 
@@ -208,11 +338,10 @@ async function setBricks(num) {
         const client = await pool.connect();
         try {
             const result = await client.query(`
-                        INSERT INTO bricks (id, count)
-                        VALUES (1, $1) ON CONFLICT (id) DO
-                        UPDATE SET count = $1, updated_at = NOW()
-                            RETURNING count
-                `, [num]);
+                INSERT INTO bricks (id, count) VALUES (1, $1)
+                    ON CONFLICT (id) DO UPDATE SET count = $1, updated_at = NOW()
+                                            RETURNING count
+            `, [num]);
 
             const newCount = result.rows[0].count;
 
@@ -257,7 +386,7 @@ app.get('/', async (req, res) => {
         SuccessResponseBricks(currentBricks, res, req);
     } catch (error) {
         console.error('Error getting bricks:', error);
-        FailureResponse(res, req);
+        FailureResponse(res, req, false); // Don't log this as a failed OTP attempt
     }
 });
 
@@ -267,8 +396,12 @@ app.get('/time', (req, res) => {
 });
 
 //Add One Brick
-app.get('/place/:id', async (req, res) => {
+app.get('/place/:id', checkIPBlocked, async (req, res) => {
+    const ip = getClientIP(req);
+
     if(CheckOTP(req.params.id)) {
+        recordSuccessfulAttempt(ip);
+        await logIPAttempt(ip, req.params.id, true, req.path);
         await PlaceBrick(1, res, req);
     } else {
         FailureResponse(res, req);
@@ -276,8 +409,12 @@ app.get('/place/:id', async (req, res) => {
 });
 
 //Add Two Bricks
-app.get('/place2/:id', async (req, res) => {
+app.get('/place2/:id', checkIPBlocked, async (req, res) => {
+    const ip = getClientIP(req);
+
     if(CheckOTP(req.params.id)) {
+        recordSuccessfulAttempt(ip);
+        await logIPAttempt(ip, req.params.id, true, req.path);
         await PlaceBrick(2, res, req);
     } else {
         FailureResponse(res, req);
@@ -285,8 +422,12 @@ app.get('/place2/:id', async (req, res) => {
 });
 
 //Add Three Bricks
-app.get('/place3/:id', async (req, res) => {
+app.get('/place3/:id', checkIPBlocked, async (req, res) => {
+    const ip = getClientIP(req);
+
     if(CheckOTP(req.params.id)) {
+        recordSuccessfulAttempt(ip);
+        await logIPAttempt(ip, req.params.id, true, req.path);
         await PlaceBrick(3, res, req);
     } else {
         FailureResponse(res, req);
@@ -312,7 +453,7 @@ async function PlaceBrick(num, res, req) {
         SuccessResponseBricks(currentBricks, res, req);
     } catch (error) {
         console.error('Error placing brick:', error);
-        FailureResponse(res, req);
+        FailureResponse(res, req, false); // Don't log this as failed OTP attempt
     }
 }
 
@@ -325,7 +466,6 @@ async function SaveBricks() {
         console.error('Error saving bricks:', error);
     }
 }
-
 
 /// Console Prompt
 
@@ -359,6 +499,59 @@ const commands = {
 
     time: () => {
         console.log(`Current time: ${new Date().toLocaleString()}`);
+    },
+
+    showblocked: () => {
+        console.log('\nCurrently blocked IPs:');
+        if (blockedIPs.size === 0) {
+            console.log('  No IPs currently blocked');
+        } else {
+            for (const [ip, block] of blockedIPs.entries()) {
+                const remainingTime = Math.ceil((block.unblockAt - Date.now()) / (60 * 1000));
+                console.log(`  ${ip} - ${remainingTime} minutes remaining`);
+            }
+        }
+    },
+
+    showfailures: () => {
+        console.log('\nIPs with failed attempts:');
+        if (ipFailures.size === 0) {
+            console.log('  No failed attempts recorded');
+        } else {
+            const now = Date.now();
+            for (const [ip, failure] of ipFailures.entries()) {
+                const recentAttempts = failure.attempts.length;
+                const lastAttemptTime = new Date(failure.lastAttempt).toLocaleString();
+                const timeUntilReset = Math.ceil((failure.attempts[0] + (IP_BLOCK_CONFIG.timeWindowMinutes * 60 * 1000) - now) / (60 * 1000));
+                console.log(`  ${ip} - ${recentAttempts}/${IP_BLOCK_CONFIG.maxFailedAttempts} attempts (last: ${lastAttemptTime}, resets in: ${timeUntilReset}min)`);
+            }
+        }
+    },
+
+    unblockip: (ip) => {
+        if (!ip) {
+            console.log('Please provide an IP address to unblock');
+            return;
+        }
+
+        if (blockedIPs.delete(ip)) {
+            console.log(`Unblocked IP: ${ip}`);
+        } else {
+            console.log(`IP ${ip} was not blocked`);
+        }
+    },
+
+    clearfailures: (ip) => {
+        if (ip) {
+            if (ipFailures.delete(ip)) {
+                console.log(`Cleared failures for IP: ${ip}`);
+            } else {
+                console.log(`No failures recorded for IP: ${ip}`);
+            }
+        } else {
+            ipFailures.clear();
+            console.log('Cleared all failure records');
+        }
     },
 
     help: () => {
@@ -464,6 +657,24 @@ async function initializeDatabase() {
                 )
             `);
 
+            // Create ip_logs table if it doesn't exist
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS ip_logs (
+                    id SERIAL PRIMARY KEY,
+                    ip_address VARCHAR(45) NOT NULL,
+                    otp_attempted VARCHAR(10),
+                    success BOOLEAN NOT NULL,
+                    endpoint VARCHAR(50),
+                    attempted_at TIMESTAMP DEFAULT NOW()
+                )
+            `);
+
+            // Create index on ip_logs for better query performance
+            await client.query(`
+                CREATE INDEX IF NOT EXISTS idx_ip_logs_ip_time 
+                ON ip_logs(ip_address, attempted_at)
+            `);
+
             // Initialize the brick count if it doesn't exist
             await client.query(`
                 INSERT INTO bricks (id, count) VALUES (1, 0)
@@ -490,15 +701,13 @@ async function main() {
     startCLI();
 
     // Set up periodic brick logging
-    const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);
+    setInterval(SaveBricks, 5 * 60 * 1000);
     // Clear Cache
-    const cleanupInterval = setInterval(CleanupCache, 5 * 60 * 1000);
-
+    setInterval(CleanupCache, 5 * 60 * 1000);
+    setInterval(cleanupExpiredFailures, IP_BLOCK_CONFIG.cleanupIntervalMinutes * 60 * 1000);
     // Graceful shutdown
     process.on('SIGTERM', () => {
         console.log('Received SIGTERM, shutting down gracefully...');
-        clearInterval(saveInterval);
-        clearInterval(cleanupInterval);
         pool.end(() => {
             console.log('Database pool closed');
             process.exit(0);
