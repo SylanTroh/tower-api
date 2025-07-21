@@ -24,24 +24,6 @@ if (!otpkey) {
     process.exit(1);
 }
 
-// // General rate limiter
-// const generalLimiter = rateLimit({
-//     windowMs: 15 * 1000,
-//     max: 4, // Limit each IP to 4 requests per 15 seconds
-//     message: {
-//         error: 'Too many requests from this IP, please try again later.',
-//         retryAfter: '15 seconds'
-//     },
-//     standardHeaders: true,
-//     legacyHeaders: false,
-//     keyGenerator: (req) => {
-//         return req.ip;
-//     }
-// });
-//
-// // Apply general rate limiting to all routes
-// app.use(generalLimiter);
-
 // Write queue to handle race conditions
 class WriteQueue {
     constructor() {
@@ -83,7 +65,7 @@ const writeQueue = new WriteQueue();
 // Cache objects with TTL
 const cache = {
     bricks: { value: null, expires: 0 },
-    otp: { value: null, counter: null, expires: 0 }
+    otps: new Map()
 };
 
 function MD5Hash(str) {
@@ -102,8 +84,9 @@ function CalculateOTP(counter) {
     const now = Date.now();
 
     // Check if we have a cached OTP for this counter
-    if (cache.otp.counter === counter && cache.otp.expires > now) {
-        return cache.otp.value;
+    const cachedOtp = cache.otps.get(counter);
+    if (cachedOtp && cachedOtp.expires > now) {
+        return cachedOtp.value;
     }
 
     let hashCode = MD5Hash(otpkey + counter);
@@ -113,13 +96,22 @@ function CalculateOTP(counter) {
 
     // Cache the OTP result for the remainder of the current interval
     const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
-    cache.otp = {
+    cache.otps.set(counter, {
         value: otp,
-        counter: counter,
         expires: nextIntervalStart
-    };
+    });
 
     return otp;
+}
+
+function CleanupCache() {
+    //Remove expired entries in the cache. Only OTPs for now
+    const now = Date.now();
+    for (const [counter, otpData] of cache.otps.entries()) {
+        if (otpData.expires <= now) {
+            cache.otps.delete(counter);
+        }
+    }
 }
 
 function CheckOTP(otp){
@@ -187,10 +179,11 @@ async function incrementBricks(num) {
         const client = await pool.connect();
         try {
             const result = await client.query(`
-                INSERT INTO bricks (id, count) VALUES (1, $1)
-                    ON CONFLICT (id) DO UPDATE SET count = bricks.count + $1, updated_at = NOW()
-                                            RETURNING count
-            `, [num]);
+                        INSERT INTO bricks (id, count)
+                        VALUES (1, $1) ON CONFLICT (id) DO
+                        UPDATE SET count = bricks.count + $1, updated_at = NOW()
+                            RETURNING count
+                `, [num]);
 
             const newCount = result.rows[0].count;
 
@@ -497,11 +490,14 @@ async function main() {
 
     // Set up periodic brick logging
     const saveInterval = setInterval(SaveBricks, 5 * 60 * 1000);
+    // Clear Cache
+    const cleanupInterval = setInterval(CleanupCache, 5 * 60 * 1000);
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
         console.log('Received SIGTERM, shutting down gracefully...');
         clearInterval(saveInterval);
+        clearInterval(cleanupInterval);
         pool.end(() => {
             console.log('Database pool closed');
             process.exit(0);
