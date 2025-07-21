@@ -208,10 +208,11 @@ async function setBricks(num) {
         const client = await pool.connect();
         try {
             const result = await client.query(`
-                INSERT INTO bricks (id, count) VALUES (1, $1)
-                    ON CONFLICT (id) DO UPDATE SET count = $1, updated_at = NOW()
-                                            RETURNING count
-            `, [num]);
+                        INSERT INTO bricks (id, count)
+                        VALUES (1, $1) ON CONFLICT (id) DO
+                        UPDATE SET count = $1, updated_at = NOW()
+                            RETURNING count
+                `, [num]);
 
             const newCount = result.rows[0].count;
 
