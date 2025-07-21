@@ -246,6 +246,16 @@ function CalculateOTP(counter) {
     return otp;
 }
 
+function CleanupCache() {
+    //Remove expired entries in the cache. Only OTPs for now
+    const now = Date.now();
+    for (const [counter, otpData] of cache.otps.entries()) {
+        if (otpData.expires <= now) {
+            cache.otps.delete(counter);
+        }
+    }
+}
+
 function CheckOTP(otp){
     let counter = CalculateCounter()
     let currentOTP = CalculateOTP(counter);

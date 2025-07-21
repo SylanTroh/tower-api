@@ -6,9 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="0875ee3b-e5a0-494b-8931-9b04c6952b41" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/index.js" afterDir="false" />
-      <change beforePath="/mnt/Media/Dropbox/Projects/tower-api/api/.idea/workspace.xml" beforeDir="false" afterPath="/mnt/Media/Dropbox/Projects/tower-api/api/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="/mnt/Media/Dropbox/Projects/tower-api/api/index.js" beforeDir="false" afterPath="/mnt/Media/Dropbox/Projects/tower-api/api/index.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,7 +32,7 @@
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;block-suspicious-acitvity&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;server&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -55,6 +52,8 @@
       <workItem from="1751509696522" duration="535000" />
       <workItem from="1751510256657" duration="16776000" />
       <workItem from="1753131984731" duration="3401000" />
+      <workItem from="1753135940586" duration="706000" />
+      <workItem from="1753140193923" duration="1287000" />
     </task>
     <servers />
   </component>
