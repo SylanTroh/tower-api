@@ -21,14 +21,15 @@ const pool = new Pool({
 // Environment variables
 const otpkey = process.env.OTP_KEY;
 const interval = 10;
+const cleanupIntervalMinutes = 5;
+const logIntervalMinutes = 5;
 
 // IP blocking configuration
 // Temporarily blocks ips that submit too many failed OTPs
 const IP_BLOCK_CONFIG = {
     maxFailedAttempts: 3,
     timeWindowMinutes: 3,
-    blockDurationMinutes: 1,
-    cleanupIntervalMinutes: 30
+    blockDurationMinutes: 1
 };
 
 if (!otpkey) {
@@ -711,10 +712,10 @@ async function main() {
     startCLI();
 
     // Set up periodic brick logging
-    setInterval(SaveBricks, 5 * 60 * 1000);
+    setInterval(SaveBricks, logIntervalMinutes * 60 * 1000);
     // Clear Cache
-    setInterval(CleanupCache, 5 * 60 * 1000);
-    setInterval(cleanupExpiredFailures, IP_BLOCK_CONFIG.cleanupIntervalMinutes * 60 * 1000);
+    setInterval(CleanupCache, cleanupIntervalMinutes * 60 * 1000);
+    setInterval(cleanupExpiredFailures, cleanupIntervalMinutes * 60 * 1000);
     // Graceful shutdown
     process.on('SIGTERM', () => {
         console.log('Received SIGTERM, shutting down gracefully...');
