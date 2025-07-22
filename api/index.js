@@ -82,7 +82,7 @@ const writeQueue = new WriteQueue();
 // Cache objects with TTL
 const cache = {
     bricks: { value: null, expires: 0 },
-    otp: { value: null, counter: null, expires: 0 }
+    otps: new Map()
 };
 
 //Due to the limitations of VRChat, I cannot truly make this API secure. So we ask nicely
@@ -227,8 +227,9 @@ function CalculateOTP(counter) {
     const now = Date.now();
 
     // Check if we have a cached OTP for this counter
-    if (cache.otp.counter === counter && cache.otp.expires > now) {
-        return cache.otp.value;
+    const cachedOtp = cache.otps.get(counter);
+    if (cachedOtp && cachedOtp.expires > now) {
+        return cachedOtp.value;
     }
 
     let hashCode = MD5Hash(otpkey + counter);
@@ -238,11 +239,10 @@ function CalculateOTP(counter) {
 
     // Cache the OTP result for the remainder of the current interval
     const nextIntervalStart = Math.ceil(Date.now() / 1000 / interval) * interval * 1000;
-    cache.otp = {
+    cache.otps.set(counter, {
         value: otp,
-        counter: counter,
         expires: nextIntervalStart
-    };
+    });
 
     return otp;
 }
